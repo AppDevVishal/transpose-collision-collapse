@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transpose Collision Collapse</title>
+<style>
+  :root{
+    --bg:#0b0f14; --surface:#121a22; --surface-2:#0e151c; --border:#22303c; --border-soft:#1a242e;
+    --ink:#e6edf3; --muted:#8b9bab; --accent:#4ea1ff; --accent-ink:#04121f;
+    --ok:#35c48a; --warn:#e3b341; --bad:#ff6b6b; --chip:#1b2530; --shadow:0 10px 30px rgba(0,0,0,.35);
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  [data-theme="light"]{
+    --bg:#f2f5f9; --surface:#ffffff; --surface-2:#f7f9fc; --border:#d6dee8; --border-soft:#e6ecf3;
+    --ink:#13212e; --muted:#5b6b7c; --accent:#1f6feb; --accent-ink:#ffffff;
+    --ok:#0f7a52; --warn:#8a6100; --bad:#b42318; --chip:#eef2f7; --shadow:0 8px 24px rgba(20,40,70,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px 64px}
+  header.top{
+    border-bottom:1px solid var(--border); background:var(--surface-2);
+    padding:20px 0 18px; margin-bottom:26px;
+  }
+  header.top .wrap{display:flex;align-items:flex-start;gap:16px;padding-bottom:0}
+  .mark{
+    flex:0 0 auto;width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+    background:linear-gradient(160deg,var(--accent),#6ad0c4);color:var(--accent-ink);
+    font-size:20px;font-weight:700;letter-spacing:-1px;
+  }
+  [data-theme="light"] .mark{background:var(--accent);color:#fff}
+  h1{font-size:21px;line-height:1.25;margin:0 0 3px;letter-spacing:-.2px}
+  .sub{margin:0;color:var(--muted);font-size:13.5px;max-width:74ch}
+  .spacer{flex:1 1 auto}
+  button{
+    font:inherit;font-size:13.5px;border-radius:9px;border:1px solid var(--border);
+    background:var(--surface);color:var(--ink);padding:8px 14px;cursor:pointer;
+  }
+  button:hover{border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+  button.primary:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.ghost{background:transparent}
+  .panel{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:20px 22px;margin-bottom:20px;box-shadow:var(--shadow);
+  }
+  .panel > h2{font-size:15.5px;letter-spacing:-.1px;color:var(--ink);margin:0 0 14px;font-weight:600}
+  .drop{
+    border:1.5px dashed var(--border);border-radius:12px;background:var(--surface-2);
+    padding:30px 22px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;
+  }
+  .drop:hover,.drop:focus-visible,.drop.over{border-color:var(--accent);background:var(--chip);outline:none}
+  .drop strong{display:block;font-size:15px;margin-bottom:5px}
+  .drop span{color:var(--muted);font-size:13px}
+  .fileline{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:14px;font-size:13.5px}
+  .chip{
+    background:var(--chip);border:1px solid var(--border-soft);border-radius:999px;
+    padding:3px 11px;font-size:12.5px;color:var(--muted);
+  }
+  .chip b{color:var(--ink);font-weight:600}
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  label.field{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted)}
+  select,input[type=text],input[type=number]{
+    font:inherit;font-size:13.5px;background:var(--surface-2);color:var(--ink);
+    border:1px solid var(--border);border-radius:8px;padding:7px 10px;min-width:130px;
+  }
+  select:focus,input:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .card{
+    border:1px solid var(--border);border-radius:12px;padding:16px 17px;background:var(--surface-2);
+    border-top:3px solid var(--muted);
+  }
+  .card.pass{border-top-color:var(--ok)}
+  .card.fail{border-top-color:var(--bad)}
+  .card h3{margin:0 0 6px;font-size:13.5px;line-height:1.4;font-weight:600;min-height:38px}
+  .verdict{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .pass .verdict{color:var(--ok)} .fail .verdict{color:var(--bad)}
+  .card .meta{color:var(--muted);font-size:12.5px;margin:6px 0 0}
+  .card .rule{color:var(--muted);font-size:12px;margin:0 0 10px;font-family:var(--mono)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-soft);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;border-bottom-color:var(--border)}
+  td.mono,span.mono{font-family:var(--mono);font-size:12.5px}
+  tr:last-child td{border-bottom:none}
+  .tblwrap{overflow-x:auto}
+  details{margin-top:10px}
+  summary{cursor:pointer;font-size:12.5px;color:var(--accent);list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary::before{content:"+ ";font-family:var(--mono)}
+  details[open] summary::before{content:"- "}
+  .adv{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 14px;margin:9px 0}
+  .adv h4{margin:0 0 3px;font-size:13px;font-weight:600}
+  .adv p{margin:0;font-size:12.5px;color:var(--muted)}
+  .adv.info{border-left-color:var(--accent)}
+  .status{margin-top:12px;font-size:13px;min-height:20px}
+  .status.err{color:var(--bad)} .status.good{color:var(--ok)} .status.warn{color:var(--warn)}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+  .opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:4px 0 16px}
+  .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--ink)}
+  .check input{margin-top:3px;accent-color:var(--accent)}
+  .check small{display:block;color:var(--muted);font-size:12px;line-height:1.45}
+  .hint{color:var(--muted);font-size:12.5px;margin:10px 0 0}
+  footer{color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);padding-top:18px;margin-top:8px}
+  footer p{margin:0 0 6px;max-width:88ch}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--chip);padding:1px 5px;border-radius:5px}
+  .hidden{display:none !important}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  @media (max-width:620px){
+    header.top .wrap{flex-wrap:wrap}
+    .spacer{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true">&#8646;</div>
+    <div>
+      <h1>Transpose Collision Collapse</h1>
+      <p class="sub">Checks a transpose mapping sheet against three structural rules, then splits colliding
+        mappings onto fresh transpose codes and hands back a corrected workbook.</p>
+    </div>
+    <div class="spacer"></div>
+    <button id="themeBtn" class="ghost" type="button" aria-pressed="false">Light mode</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section class="panel">
+    <h2>1. Load a mapping sheet</h2>
+    <div id="drop" class="drop" tabindex="0" role="button" aria-controls="fileInput">
+      <strong>Drop an .xlsx or .csv here</strong>
+      <span>or click to browse. Nothing is uploaded; the file is read in this browser tab.</span>
+    </div>
+    <label class="sr" for="fileInput">Mapping sheet file</label>
+    <input id="fileInput" type="file" accept=".xlsx,.xlsm,.csv,.txt" class="sr" aria-label="Mapping sheet file">
+    <div id="fileLine" class="fileline hidden"></div>
+    <div id="loadStatus" class="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="mapPanel" class="panel hidden">
+    <h2>2. Columns</h2>
+    <div id="mapRow" class="row"></div>
+    <p class="hint">Three columns are required: Transpose, Target Column and Source Table. The rest are used for
+      reporting and for writing notes back into the sheet when a column exists.</p>
+  </section>
+
+  <section id="checksPanel" class="panel hidden">
+    <h2>3. The three rules</h2>
+    <div id="summary" class="fileline" style="margin:0 0 16px"></div>
+    <div id="cards" class="cards"></div>
+    <div id="details"></div>
+    <div id="advisories"></div>
+  </section>
+
+  <section id="repairPanel" class="panel hidden">
+    <h2>4. Collapse collisions</h2>
+    <div class="opts">
+      <label class="check">
+        <input type="checkbox" id="optIgnoreCase" checked>
+        <span>Treat the global bucket as case-insensitive
+          <small>Rows marked All, ALL or all count as one bucket and are excluded from the three rules.</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optPad" checked>
+        <span>Keep every code a complete record
+          <small>A new code inherits the columns of the transpose it came from, and any code left on a single
+            row borrows from the nearest sibling. Every copied row is logged as ADDED for review.</small></span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="optNormaliseAll">
+        <span>Normalise the global bucket label
+          <small>Rewrites All, ALL and all to a single spelling so the bucket fires once.</small></span>
+      </label>
+      <label class="field">Code prefix
+        <input type="text" id="optPrefix" value="PR" spellcheck="false">
+      </label>
+      <label class="field">Start numbering at
+        <input type="number" id="optStart" value="100" min="1" step="1">
+      </label>
+    </div>
+    <div class="toolbar">
+      <button id="fixBtn" class="primary" type="button">Collapse collisions</button>
+      <button id="xlsxBtn" type="button" disabled>Download corrected .xlsx</button>
+      <button id="csvBtn" type="button" disabled>Download .csv</button>
+    </div>
+    <div id="fixStatus" class="status" role="status" aria-live="polite"></div>
+    <div id="fixOut"></div>
+  </section>
+
+  <footer>
+    <p><strong>Rule 1.</strong> Outside the global bucket, no transpose may hold the same Target Column twice.
+      <strong>Rule 2.</strong> Outside the global bucket, a transpose may draw on one Source Table only.
+      <strong>Rule 3.</strong> No transpose may be entered on a single row.</p>
+    <p>Nothing is deleted. Colliding rows are reassigned to unused codes, keeping the largest group on the
+      original code. The tool will not tell you which of two competing definitions is the authoritative one,
+      and it does not repair mapping logic.</p>
+  </footer>
+</div>
+
+<script>
+(function (root) {
+  'use strict';
+
+  /* =================================================================== utils */
+
+  function nz(v) { return v === null || v === undefined ? '' : v; }
+  function s(v) { return String(nz(v)).trim(); }
+  function key(v) { return s(v).toUpperCase(); }
+
+  function esc(t) {
+    return String(nz(t)).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function xmlEsc(t) {
+    return String(nz(t))
+      .replace(/[&<>]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]; })
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  }
+  function xmlUnesc(t) {
+    return String(t)
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'").replace(/&#(\d+);/g, function (_, d) { return String.fromCharCode(+d); })
+      .replace(/&amp;/g, '&');
+  }
+  function attr(tag, name) {
+    var m = tag.match(new RegExp('(?:^|\\s)' + name + '\\s*=\\s*"([^"]*)"'));
+    return m ? m[1] : null;
+  }
+  function codeNum(code) {
+    var m = String(code).match(/(\d+)\s*$/);
+    return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+  }
+  function sortCodes(list) {
+    return list.slice().sort(function (a, b) {
+      var d = codeNum(a) - codeNum(b);
+      if (d !== 0) return d;
+      return String(a).localeCompare(String(b));
+    });
+  }
+
+  /* ===================================================================== zip */
+
+  async function unzip(buffer) {
+    var u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    var dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    var eocd = -1, floor = Math.max(0, u8.length - 66000);
+    for (var i = u8.length - 22; i >= floor; i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('This file is not a readable .xlsx. It has no zip directory.');
+    var count = dv.getUint16(eocd + 10, true);
+    var off = dv.getUint32(eocd + 16, true);
+    var dec = new TextDecoder('utf-8'), out = {};
+    for (var k = 0; k < count; k++) {
+      if (dv.getUint32(off, true) !== 0x02014b50) break;
+      var method = dv.getUint16(off + 10, true);
+      var csize = dv.getUint32(off + 20, true);
+      var nameLen = dv.getUint16(off + 28, true);
+      var extraLen = dv.getUint16(off + 30, true);
+      var cmtLen = dv.getUint16(off + 32, true);
+      var lho = dv.getUint32(off + 42, true);
+      var name = dec.decode(u8.subarray(off + 46, off + 46 + nameLen));
+      var lnameLen = dv.getUint16(lho + 26, true);
+      var lextraLen = dv.getUint16(lho + 28, true);
+      var start = lho + 30 + lnameLen + lextraLen;
+      out[name] = { method: method, raw: u8.subarray(start, start + csize) };
+      off += 46 + nameLen + extraLen + cmtLen;
+    }
+    return out;
+  }
+
+  async function inflateRaw(u8) {
+    if (typeof DecompressionStream === 'undefined') {
+      throw new Error('This browser cannot decompress .xlsx files. Use Chrome, Edge, Firefox 113 or later, ' +
+        'or save the sheet as .csv and drop that instead.');
+    }
+    var stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  async function entryBytes(files, name) {
+    var e = files[name];
+    if (!e) return null;
+    return e.method === 0 ? e.raw : await inflateRaw(e.raw);
+  }
+
+  async function entryText(files, name) {
+    var b = await entryBytes(files, name);
+    return b ? new TextDecoder('utf-8').decode(b) : null;
+  }
+
+  /* ================================================================== crc32 */
+
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(u8) {
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipStore(entries) {
+    var chunks = [], central = [], offset = 0, enc = new TextEncoder();
+    entries.forEach(function (f) {
+      var nameBytes = enc.encode(f.name);
+      var data = f.data;
+      var crc = crc32(data);
+      var local = new Uint8Array(30 + nameBytes.length);
+      var dv = new DataView(local.buffer);
+      dv.setUint32(0, 0x04034b50, true); dv.setUint16(4, 20, true); dv.setUint16(6, 0, true);
+      dv.setUint16(8, 0, true); dv.setUint16(10, 0, true); dv.setUint16(12, 0, true);
+      dv.setUint32(14, crc, true); dv.setUint32(18, data.length, true); dv.setUint32(22, data.length, true);
+      dv.setUint16(26, nameBytes.length, true); dv.setUint16(28, 0, true);
+      local.set(nameBytes, 30);
+
+      var cd = new Uint8Array(46 + nameBytes.length);
+      var cv = new DataView(cd.buffer);
+      cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true);
+      cv.setUint16(8, 0, true); cv.setUint16(10, 0, true); cv.setUint16(12, 0, true);
+      cv.setUint16(14, 0, true);
+      cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true);
+      cv.setUint16(28, nameBytes.length, true); cv.setUint16(30, 0, true);
+      cv.setUint16(32, 0, true); cv.setUint16(34, 0, true); cv.setUint16(36, 0, true);
+      cv.setUint32(38, 0, true); cv.setUint32(42, offset, true);
+      cd.set(nameBytes, 46);
+
+      chunks.push(local, data);
+      central.push(cd);
+      offset += local.length + data.length;
+    });
+    var cdSize = central.reduce(function (a, c) { return a + c.length; }, 0);
+    var eocd = new Uint8Array(22);
+    var ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true); ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
+    ev.setUint16(8, entries.length, true); ev.setUint16(10, entries.length, true);
+    ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true); ev.setUint16(20, 0, true);
+
+    var total = offset + cdSize + 22;
+    var result = new Uint8Array(total);
+    var p = 0;
+    chunks.forEach(function (c) { result.set(c, p); p += c.length; });
+    central.forEach(function (c) { result.set(c, p); p += c.length; });
+    result.set(eocd, p);
+    return result;
+  }
+
+  /* ============================================================== xlsx read */
+
+  function colIndex(ref) {
+    var letters = String(ref).replace(/[^A-Z]/gi, '').toUpperCase();
+    var n = 0;
+    for (var i = 0; i < letters.length; i++) n = n * 26 + (letters.charCodeAt(i) - 64);
+    return n - 1;
+  }
+
+  function parseSharedStrings(xml) {
+    if (!xml) return [];
+    var items = xml.split(/<si\b/).slice(1);
+    return items.map(function (chunk) {
+      var all = '', m;
+      var re = /<t\b[^>]*>([\s\S]*?)<\/t>/g;
+      while ((m = re.exec(chunk))) all += xmlUnesc(m[1]);
+      if (!all) {
+        var selfClosed = /<t\b[^>]*\/>/.exec(chunk);
+        if (selfClosed) all = '';
+      }
+      return all;
+    });
+  }
+
+  function parseSheetXml(xml, shared) {
+    var rows = [], rowRe = /<row\b([^>]*)>([\s\S]*?)<\/row>/g, rm;
+    while ((rm = rowRe.exec(xml))) {
+      var rowAttr = rm[1], body = rm[2];
+      var rAttr = attr(rowAttr, 'r');
+      var rowIdx = rAttr ? parseInt(rAttr, 10) - 1 : rows.length;
+      var cells = [];
+      var cellRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, cm;
+      while ((cm = cellRe.exec(body))) {
+        var cAttr = cm[1], cBody = cm[2] || '';
+        var ref = attr(cAttr, 'r');
+        var type = attr(cAttr, 't');
+        var ci = ref ? colIndex(ref) : cells.length;
+        var value = '';
+        if (type === 'inlineStr') {
+          var tm = /<t\b[^>]*>([\s\S]*?)<\/t>/.exec(cBody);
+          value = tm ? xmlUnesc(tm[1]) : '';
+        } else if (type === 's') {
+          var vm = /<v>([\s\S]*?)<\/v>/.exec(cBody);
+          var idx = vm ? parseInt(vm[1], 10) : -1;
+          value = idx >= 0 && shared[idx] !== undefined ? shared[idx] : '';
+        } else if (type === 'str') {
+          var v2 = /<v>([\s\S]*?)<\/v>/.exec(cBody);
+          value = v2 ? xmlUnesc(v2[1]) : '';
+        } else if (type === 'b') {
+          var v3 = /<v>([\s\S]*?)<\/v>/.exec(cBody);
+          value = v3 ? (v3[1] === '1' ? 'TRUE' : 'FALSE') : '';
+        } else {
+          var v4 = /<v>([\s\S]*?)<\/v>/.exec(cBody);
+          if (v4) {
+            var num = Number(v4[1]);
+            value = isFinite(num) ? num : xmlUnesc(v4[1]);
+          }
+        }
+        while (cells.length < ci) cells.push('');
+        cells[ci] = value;
+      }
+      while (rows.length < rowIdx) rows.push([]);
+      rows[rowIdx] = cells;
+    }
+    for (var i = 0; i < rows.length; i++) if (!rows[i]) rows[i] = [];
+    return rows;
+  }
+
+  async function parseXlsx(buffer) {
+    var files = await unzip(buffer);
+    var shared = parseSharedStrings(await entryText(files, 'xl/sharedStrings.xml'));
+    var wbXml = await entryText(files, 'xl/workbook.xml');
+    if (!wbXml) throw new Error('This .xlsx has no workbook part. It may be password protected or corrupt.');
+    var relXml = await entryText(files, 'xl/_rels/workbook.xml.rels');
+    var rels = {};
+    if (relXml) {
+      var rre = /<Relationship\b([^>]*)\/?>/g, rrm;
+      while ((rrm = rre.exec(relXml))) {
+        var id = attr(rrm[1], 'Id'), target = attr(rrm[1], 'Target');
+        if (id && target) rels[id] = target;
+      }
+    }
+    var sheets = [], sre = /<sheet\b([^>]*)\/?>/g, sm;
+    while ((sm = sre.exec(wbXml))) {
+      var name = attr(sm[1], 'name');
+      var rid = attr(sm[1], 'r:id') || attr(sm[1], 'sheetId');
+      var target = rels[rid];
+      if (!target) {
+        var n = sheets.length + 1;
+        target = 'worksheets/sheet' + n + '.xml';
+      }
+      target = String(target).replace(/^\/?xl\//, '').replace(/^\//, '');
+      var xml = await entryText(files, 'xl/' + target);
+      if (!xml) xml = await entryText(files, target);
+      if (xml) sheets.push({ name: name || ('Sheet' + (sheets.length + 1)), rows: parseSheetXml(xml, shared) });
+    }
+    if (!sheets.length) {
+      var first = await entryText(files, 'xl/worksheets/sheet1.xml');
+      if (first) sheets.push({ name: 'Sheet1', rows: parseSheetXml(first, shared) });
+    }
+    if (!sheets.length) throw new Error('No worksheets found in this workbook.');
+    return sheets;
+  }
+
+  function parseCsv(text) {
+    var rows = [], row = [], cur = '', q = false, i = 0;
+    while (i < text.length) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cur += '"'; i += 2; continue; }
+          q = false; i++; continue;
+        }
+        cur += ch; i++; continue;
+      }
+      if (ch === '"') { q = true; i++; continue; }
+      if (ch === ',') { row.push(cur); cur = ''; i++; continue; }
+      if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; i++; continue; }
+      if (ch === '\r') { i++; continue; }
+      cur += ch; i++;
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  /* =========================================================== column detect */
+
+  var FIELDS = [
+    { id: 'transpose', label: 'Transpose', required: true, exact: ['transpose', 'transposes', 'transpose code', 'transpose rule', 'transpose id'], loose: /transpose/i },
+    { id: 'sourceTable', label: 'Source Table', required: true, exact: ['source table', 'source dataset', 'table'], loose: /source\s*table/i },
+    { id: 'targetTable', label: 'Target Table', required: false, exact: ['target table', 'target dataset'], loose: /target\s*table/i },
+    { id: 'sourceCol', label: 'Source Column', required: false, exact: ['source column', 'source variable', 'source field'], loose: /source\s*(col|variable|field)/i },
+    { id: 'targetCol', label: 'Target Column', required: true, exact: ['target column', 'target variable', 'target field'], loose: /target\s*(col|variable|field)/i },
+    { id: 'sourceSystem', label: 'Source System', required: false, exact: ['source system', 'system'], loose: /source\s*system/i },
+    { id: 'dataType', label: 'Data Type', required: false, exact: ['datatype', 'data type', 'type'], loose: /data\s*type|^type$/i },
+    { id: 'length', label: 'Length', required: false, exact: ['length', 'len', 'size'], loose: /^(length|len|size)$/i },
+    { id: 'logic', label: 'Mapping Logic', required: false, exact: ['mapping logic', 'mapping logic pseudo code', 'logic', 'expression', 'mapping rule'], loose: /logic|pseudo|expression|mapping/i },
+    { id: 'notes', label: 'Additional Details', required: false, exact: ['additional details', 'additional detail', 'comments', 'notes', 'remarks'], loose: /additional|detail|comment|note|remark/i }
+  ];
+
+  function normHeader(h) {
+    return s(h).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  }
+
+  function detectMap(headers) {
+    var map = {}, used = {}, norms = headers.map(normHeader);
+    FIELDS.forEach(function (f) {
+      var best = -1, bestScore = 0;
+      for (var i = 0; i < headers.length; i++) {
+        if (used[i]) continue;
+        var h = s(headers[i]);
+        if (!h) continue;
+        var score = 0;
+        if (f.exact.indexOf(norms[i]) >= 0) score = 3;
+        else if (f.loose.test(h)) score = 2;
+        if (score > bestScore) { bestScore = score; best = i; }
+      }
+      if (best >= 0) { map[f.id] = best; used[best] = 1; }
+    });
+    return map;
+  }
+
+  /* ================================================================= records */
+
+  function toRecords(rows, map, startRow) {
+    var recs = [], first = startRow === undefined ? 1 : startRow;
+    for (var i = first; i < rows.length; i++) {
+      var cells = rows[i] || [];
+      var blank = true;
+      for (var c = 0; c < cells.length; c++) {
+        if (s(cells[c]) !== '') { blank = false; break; }
+      }
+      if (blank) continue;
+      recs.push({
+        id: 'r' + i,
+        row: i + 1,
+        cells: cells.slice(),
+        t: s(cells[map.transpose]),
+        tgt: s(cells[map.targetCol]),
+        st: s(cells[map.sourceTable]),
+        sc: map.sourceCol === undefined ? '' : s(cells[map.sourceCol])
+      });
+    }
+    return recs;
+  }
+
+  function bucketOf(recs, opts) {
+    var counts = {}, labels = [];
+    (recs || []).forEach(function (r) {
+      if (key(r.t) !== 'ALL') return;
+      if (!counts[r.t]) { counts[r.t] = 0; labels.push(r.t); }
+      counts[r.t] += 1;
+    });
+    if (!labels.length) return { mode: 'none', labels: [], counts: {}, canonical: '' };
+    labels.sort(function (a, b) { return counts[b] - counts[a] || String(a).localeCompare(String(b)); });
+    return {
+      mode: opts && opts.ignoreCaseAll === false ? 'exact' : 'loose',
+      labels: labels, counts: counts, canonical: labels[0]
+    };
+  }
+
+  function isAllCode(code, bucket) {
+    if (!bucket || bucket.mode === 'none') return false;
+    if (bucket.mode === 'loose') return key(code) === 'ALL';
+    return s(code) === bucket.canonical;
+  }
+
+  /* ================================================================== checks */
+
+  function runChecks(recs, opts) {
+    opts = opts || {};
+    var bucket = bucketOf(recs, opts);
+    var groups = new Map();
+    recs.forEach(function (r) {
+      if (!groups.has(r.t)) groups.set(r.t, { code: r.t, rows: [] });
+      groups.get(r.t).rows.push(r);
+    });
+
+    var list = [];
+    groups.forEach(function (g) {
+      var targets = [], byTarget = new Map();
+      g.rows.forEach(function (r) {
+        var k = key(r.tgt);
+        if (!byTarget.has(k)) { byTarget.set(k, []); targets.push(r.tgt); }
+        byTarget.get(k).push(r);
+      });
+      var tables = [], seen = {};
+      g.rows.forEach(function (r) {
+        var k = key(r.st);
+        if (!seen[k]) { seen[k] = 1; tables.push(r.st); }
+      });
+      g.targets = targets;
+      g.byTarget = byTarget;
+      g.tables = tables;
+      g.isAll = isAllCode(g.code, bucket);
+      list.push(g);
+    });
+
+    var nonAll = list.filter(function (g) { return !g.isAll; });
+    var allGroups = list.filter(function (g) { return g.isAll; });
+
+    var c1 = [], c2 = [], c3 = [];
+    nonAll.forEach(function (g) {
+      g.byTarget.forEach(function (rows, k) {
+        if (rows.length > 1) {
+          c1.push({
+            code: g.code, target: rows[0].tgt, count: rows.length, codeRows: g.rows.length,
+            rows: rows.map(function (r) { return { row: r.row, srcCol: r.sc, srcTable: r.st }; })
+          });
+        }
+      });
+      if (g.tables.length > 1) {
+        c2.push({ code: g.code, tables: g.tables, rows: g.rows.map(function (r) { return r.row; }) });
+      }
+      if (g.rows.length < 2) {
+        c3.push({ code: g.code, rows: g.rows.map(function (r) { return r.row; }), targets: g.targets });
+      }
+    });
+
+    var allLabels = {};
+    allGroups.forEach(function (g) { allLabels[g.code] = g.rows.length; });
+
+    var out = {
+      rows: recs.length,
+      codeCount: nonAll.length,
+      allRows: allGroups.reduce(function (a, g) { return a + g.rows.length; }, 0),
+      allLabels: allLabels,
+      groups: list.slice().sort(function (a, b) {
+        if (a.isAll !== b.isAll) return a.isAll ? 1 : -1;
+        return sortCodes([a.code, b.code])[0] === a.code ? -1 : 1;
+      }),
+      c1: { fail: c1.length > 0, count: c1.length, codes: uniqueCodes(c1), details: c1 },
+      c2: { fail: c2.length > 0, count: c2.length, codes: uniqueCodes(c2), details: c2 },
+      c3: { fail: c3.length > 0, count: c3.length, codes: uniqueCodes(c3), details: c3 },
+      advisories: advisories(list, opts, bucket),
+      bucket: bucket
+    };
+    return out;
+  }
+
+  function uniqueCodes(list) {
+    var seen = {}, out = [];
+    list.forEach(function (d) { if (!seen[d.code]) { seen[d.code] = 1; out.push(d.code); } });
+    return sortCodes(out);
+  }
+
+  function advisories(list, opts, bucket) {
+    var out = [];
+    var nonAll = list.filter(function (g) { return !g.isAll; });
+    var allGroups = list.filter(function (g) { return g.isAll; });
+
+    if (bucket && bucket.labels.length > 1) {
+      var parts = bucket.labels.map(function (l) { return '"' + l + '" on ' + bucket.counts[l] + ' rows'; }).join(', ');
+      out.push(bucket.mode === 'exact'
+        ? {
+          level: 'warn',
+          title: 'The global bucket is spelled ' + bucket.labels.length + ' ways; only "' + bucket.canonical + '" counts as the bucket',
+          detail: parts + '. Every other spelling is being checked as an ordinary transpose. Normalise the label so the block loads once.'
+        }
+        : {
+          level: 'warn',
+          title: 'The global bucket is spelled ' + bucket.labels.length + ' ways',
+          detail: parts + '. A case-sensitive filter in the load will split it, so normalise the label or compare case-insensitively.'
+        });
+    }
+
+    if (allGroups.length) {
+      var seenTarget = new Map(), repeated = [];
+      allGroups.forEach(function (g) {
+        g.byTarget.forEach(function (rows, k) {
+          if (rows.length > 1) repeated.push(rows[0].tgt + ' (' + rows.length + ' rows)');
+        });
+      });
+      if (repeated.length) {
+        out.push({
+          level: 'info',
+          title: 'Target columns repeated inside the global bucket: ' + repeated.length,
+          detail: repeated.join(', ') + '. Excluded from rule 1 by definition, but check whether both rows should load.'
+        });
+      }
+    }
+
+    // scoped by source table: the global block of one table cannot collide with another table
+    var bucketFields = new Map();
+    allGroups.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        var k = key(r.st) + '|' + key(r.tgt);
+        if (!bucketFields.has(k)) bucketFields.set(k, { table: r.st, target: r.tgt, codes: [] });
+      });
+    });
+    nonAll.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        var k = key(r.st) + '|' + key(r.tgt);
+        var hit = bucketFields.get(k);
+        if (hit && hit.codes.indexOf(g.code) < 0) hit.codes.push(g.code);
+      });
+    });
+    var overlap = Array.from(bucketFields.values()).filter(function (o) { return o.codes.length; });
+    if (overlap.length) {
+      out.push({
+        level: 'warn',
+        title: 'Target columns written by both the global bucket and a transpose: ' + overlap.length,
+        detail: overlap.map(function (o) {
+          return o.target + ' on ' + o.table + ' (' + o.codes.length + ' transpose' +
+            (o.codes.length === 1 ? '' : 's') + ': ' + o.codes.slice(0, 6).join(', ') +
+            (o.codes.length > 6 ? ', ...' : '') + ')';
+        }).join('; ') + '. Both write to the same field, so decide which one wins.'
+      });
+    }
+
+    // a source column reused by many transposes is a shared field, not an event of its own
+    var srcSpread = new Map();
+    nonAll.forEach(function (g) {
+      var seen = {};
+      g.rows.forEach(function (r) {
+        if (!r.sc) return;
+        var k = key(r.st) + '|' + key(r.sc);
+        if (seen[k]) return;
+        seen[k] = 1;
+        srcSpread.set(k, (srcSpread.get(k) || 0) + 1);
+      });
+    });
+
+    var dup = new Map();
+    nonAll.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        if (!r.sc) return;                       // table constants repeat by design
+        if ((srcSpread.get(key(r.st) + '|' + key(r.sc)) || 0) > 3) return;
+        var k = key(r.st) + '|' + key(r.sc) + '|' + key(r.tgt);
+        if (!dup.has(k)) dup.set(k, []);
+        dup.get(k).push({ code: g.code, row: r.row, st: r.st, sc: r.sc, tgt: r.tgt });
+      });
+    });
+    var doubles = [];
+    dup.forEach(function (hits) {
+      var codes = {};
+      hits.forEach(function (h) { codes[h.code] = 1; });
+      if (Object.keys(codes).length > 1) doubles.push(hits[0].sc + ' to ' + hits[0].tgt + ' in ' + Object.keys(codes).join(' and '));
+    });
+    if (doubles.length) {
+      out.push({
+        level: 'warn',
+        title: 'The same source column is mapped to the same target column in more than one transpose: ' + doubles.length,
+        detail: doubles.slice(0, 40).join('; ') + (doubles.length > 40 ? '; and more' : '') +
+          '. Rule 1 cannot see this once the rows sit in different transposes, but both definitions will fire.'
+      });
+    }
+
+    var single = nonAll.filter(function (g) { return g.rows.length === 1; });
+    if (single.length) {
+      out.push({
+        level: 'warn',
+        title: 'Single-row transposes on input: ' + single.length,
+        detail: single.map(function (g) { return g.code; }).join(', ') + '.'
+      });
+    }
+
+    return out;
+  }
+
+  /* ================================================================== repair */
+
+  function nextCodeFactory(used, opts) {
+    var counter = opts.start || 100;
+    var prefix = opts.prefix || 'PR';
+    return function () {
+      var c;
+      do { c = prefix + counter++; } while (used[key(c)]);
+      used[key(c)] = 1;
+      return c;
+    };
+  }
+
+  function cloneRec(r) {
+    return {
+      id: r.id + '-c', row: r.row, cells: r.cells.slice(),
+      t: r.t, tgt: r.tgt, st: r.st, sc: r.sc,
+      isNew: false, movedFrom: null, addedFrom: null
+    };
+  }
+
+  function setCell(rec, map, field, value) {
+    var idx = map[field];
+    if (idx === undefined || idx < 0) return;
+    while (rec.cells.length <= idx) rec.cells.push('');
+    rec.cells[idx] = value;
+  }
+
+  function appendNote(rec, map, text) {
+    var idx = map.notes;
+    if (idx === undefined || idx < 0) return;
+    while (rec.cells.length <= idx) rec.cells.push('');
+    var prior = s(rec.cells[idx]);
+    rec.cells[idx] = prior ? prior + ' | ' + text : text;
+  }
+
+  function collapse(recs, map, opts) {
+    opts = opts || {};
+    opts.ignoreCaseAll = opts.ignoreCaseAll !== false;
+    opts.pad = opts.pad !== false;
+    opts.complete = opts.complete !== false;
+    opts.start = opts.start || 100;
+    opts.prefix = opts.prefix || 'PR';
+
+    var bucket = bucketOf(recs, opts);
+    var before = runChecks(recs, opts);
+    var origin = recs.slice();
+    var work = recs.map(cloneRec);
+    var used = {};
+    work.forEach(function (r) { used[key(r.t)] = 1; });
+    var nextCode = nextCodeFactory(used, opts);
+    var log = [], queued = {};
+
+    function groupsOf(list) {
+      var g = new Map();
+      list.forEach(function (r) {
+        if (!g.has(r.t)) g.set(r.t, { code: r.t, rows: [] });
+        g.get(r.t).rows.push(r);
+      });
+      return g;
+    }
+
+    // the first untouched row that already maps this source column to this target
+    function findExact(srcCol, tgt, skipCode) {
+      if (!srcCol) return null;
+      for (var i = 0; i < origin.length; i++) {
+        var r = origin[i];
+        if (key(r.tgt) !== key(tgt)) continue;
+        if (key(r.sc) !== key(srcCol)) continue;
+        if (skipCode !== null && s(r.t) === s(skipCode)) continue;
+        return r;
+      }
+      return null;
+    }
+
+    function addRow(anchor, tpl, code, newSrc, note) {
+      var copy = {
+        id: tpl.id + '~' + anchor.id + '~' + (queued[anchor.id] ? queued[anchor.id].length : 0),
+        row: null, cells: tpl.cells.slice(), t: code, tgt: tpl.tgt, st: tpl.st,
+        sc: newSrc === null ? tpl.sc : newSrc, isNew: true, addedFrom: tpl.t
+      };
+      if (newSrc !== null && map.sourceCol !== undefined && map.sourceCol >= 0) {
+        while (copy.cells.length <= map.sourceCol) copy.cells.push('');
+        copy.cells[map.sourceCol] = newSrc;
+      }
+      if (map.notes !== undefined && map.notes >= 0) copy.cells[map.notes] = '';
+      setCell(copy, map, 'transpose', code);
+      appendNote(copy, map, note);
+      if (!queued[anchor.id]) queued[anchor.id] = [];
+      queued[anchor.id].push(copy);
+      log.push({
+        ref: copy, rowIn: null, before: '', after: code, table: copy.st, srcCol: copy.sc,
+        tgtCol: copy.tgt, action: 'Added',
+        detail: copy.tgt + ' taken from ' + (tpl.t || 'the same sheet') +
+          ' to keep ' + code + ' a complete record'
+      });
+    }
+
+    // fill a code out to the target list of the transpose it came from
+    function complete(code, anchor, anchorSrc, primarySrc, targets, present, parents) {
+      targets.forEach(function (t) {
+        if (present[key(t)]) return;
+        var tpl = findExact(anchorSrc, t, code), newSrc = null, how = 'same source column';
+        if (!tpl && parents && parents[key(t)]) {
+          var p = parents[key(t)];
+          tpl = p;
+          if (primarySrc && p.sc && anchorSrc && key(p.sc) === key(primarySrc) && key(p.sc) !== key(anchorSrc)) {
+            newSrc = anchorSrc;
+            how = 'the sibling event, source column rewritten';
+          } else {
+            how = 'table constant';
+          }
+        }
+        if (!tpl) return;
+        addRow(anchor, tpl, code, newSrc,
+          'ADDED by Transpose Collision Collapse: ' + t + ' from ' + (tpl.t || 'the same sheet') +
+          ' (' + how + ') so ' + code + ' keeps every column it had before the split; verify mapping');
+      });
+    }
+
+    function moveRow(r, from, to, why) {
+      r.t = to;
+      setCell(r, map, 'transpose', to);
+      r.movedFrom = from;
+      appendNote(r, map, 'Moved from ' + from + ': ' + why);
+      log.push({
+        ref: r, rowIn: r.row, before: from, after: to, table: r.st, srcCol: r.sc,
+        tgtCol: r.tgt, action: 'Relocated', detail: why + '; reassigned to ' + to
+      });
+    }
+
+    // ---- pass 1: one event per transpose
+    sortCodes(Array.from(groupsOf(work).keys())).forEach(function (code) {
+      if (isAllCode(code, bucket)) return;
+      var grp = groupsOf(work).get(code);
+      if (!grp || grp.rows.length < 2) return;
+      var rows = grp.rows;
+
+      var tgtCount = {}, targets = [];
+      rows.forEach(function (r) {
+        var k = key(r.tgt);
+        if (!tgtCount[k]) { tgtCount[k] = 0; targets.push(r.tgt); }
+        tgtCount[k] += 1;
+      });
+      var dupeTargets = targets.filter(function (t) { return tgtCount[key(t)] > 1; });
+      if (!dupeTargets.length) return;
+
+      var parents = {};
+      rows.forEach(function (r) { if (!parents[key(r.tgt)]) parents[key(r.tgt)] = r; });
+
+      var events = [], index = {};
+      rows.forEach(function (r) {
+        if (!r.sc) return;
+        var k = key(r.sc);
+        if (!(k in index)) { index[k] = events.length; events.push({ src: r.sc, rows: [] }); }
+        events[index[k]].rows.push(r);
+      });
+      events.forEach(function (e) {
+        e.eligible = e.rows.some(function (r) { return tgtCount[key(r.tgt)] > 1; });
+      });
+      var eligible = events.filter(function (e) { return e.eligible; });
+
+      if (eligible.length < 2) {
+        // one event carrying the duplicate, or no source column to separate on
+        dupeTargets.forEach(function (t) {
+          var group = rows.filter(function (r) { return key(r.tgt) === key(t); });
+          if (group.length < 2) return;
+          var newCode = nextCode();
+          group.slice(1).forEach(function (r) {
+            moveRow(r, code, newCode, t + ' is mapped ' + group.length + ' times in ' + code);
+          });
+          if (!opts.complete) return;
+          var present = {};
+          group.slice(1).forEach(function (r) { present[key(r.tgt)] = 1; });
+          complete(newCode, group[group.length - 1], group[0].sc, group[0].sc,
+            targets, present, parents);
+        });
+        return;
+      }
+
+      eligible.sort(function (a, b) {
+        if (b.rows.length !== a.rows.length) return b.rows.length - a.rows.length;
+        return a.rows[0].row - b.rows[0].row;
+      });
+      var primary = eligible[0];
+
+      eligible.slice(1).forEach(function (ev) {
+        var newCode = nextCode();
+        ev.rows.forEach(function (r) {
+          moveRow(r, code, newCode, r.tgt + ' was already mapped in ' + code + ' by ' + primary.src);
+        });
+        if (!opts.complete) return;
+        var present = {};
+        ev.rows.forEach(function (r) { present[key(r.tgt)] = 1; });
+        complete(newCode, ev.rows[ev.rows.length - 1], ev.src, primary.src, targets, present, parents);
+      });
+
+      // the code that keeps its name may have lost a column to the move
+      if (opts.complete) {
+        var present = {};
+        rows.forEach(function (r) { if (r.t === code) present[key(r.tgt)] = 1; });
+        complete(code, primary.rows[primary.rows.length - 1], primary.src, primary.src,
+          targets, present, null);
+      }
+    });
+
+    // fold the pass 1 additions in, so pass 2 counts rows as they now stand
+    function rebuild(list, q) {
+      var out = [];
+      list.forEach(function (r) {
+        out.push(r);
+        (q[r.id] || []).forEach(function (x) { out.push(x); });
+      });
+      return out;
+    }
+    work = rebuild(work, queued);
+    queued = {};
+
+    // ---- pass 2: any code still on one row borrows from the closest sibling
+    if (opts.pad) {
+      Array.from(groupsOf(work).keys()).forEach(function (code) {
+        if (isAllCode(code, bucket)) return;
+        var grp2 = groupsOf(work).get(code);
+        if (!grp2 || grp2.rows.length !== 1) return;
+        var orphan = grp2.rows[0];
+        var cands = Array.from(groupsOf(work).values()).map(function (g) { return g.rows; }).filter(function (list) {
+          if (isAllCode(list[0].t, bucket) || list[0].t === code || list.length < 2) return false;
+          if (key(list[0].st) !== key(orphan.st)) return false;
+          var seen = {}, dupe = false, has = false;
+          list.forEach(function (r) {
+            var k = key(r.tgt);
+            if (seen[k]) dupe = true;
+            seen[k] = 1;
+            if (k === key(orphan.tgt)) has = true;
+          });
+          return !dupe && has;
+        });
+        if (!cands.length) return;
+        cands.sort(function (a, b) {
+          var sa = a.some(function (r) { return r.sc && key(r.sc) === key(orphan.sc); }) ? 0 : 1;
+          var sb = b.some(function (r) { return r.sc && key(r.sc) === key(orphan.sc); }) ? 0 : 1;
+          if (sa !== sb) return sa - sb;
+          if (a.length !== b.length) return a.length - b.length;
+          return codeNum(a[0].t) - codeNum(b[0].t);
+        });
+        var sibling = cands[0], parents = {}, present = {};
+        present[key(orphan.tgt)] = 1;
+        sibling.forEach(function (r) { if (!parents[key(r.tgt)]) parents[key(r.tgt)] = r; });
+        complete(code, orphan, orphan.sc, '', sibling.map(function (r) { return r.tgt; }), present, parents);
+      });
+    }
+
+    // ---- pass 3: normalise the global bucket label
+    if (opts.normaliseAll && bucket.labels.length > 1) {
+      work.forEach(function (r) {
+        if (isAllCode(r.t, bucket) && r.t !== bucket.canonical) {
+          var from = r.t;
+          r.t = bucket.canonical;
+          setCell(r, map, 'transpose', bucket.canonical);
+          appendNote(r, map, 'Global bucket label normalised from ' + from + ' to ' + bucket.canonical);
+          log.push({
+            ref: r, rowIn: r.row, before: from, after: bucket.canonical, table: r.st,
+            srcCol: r.sc, tgtCol: r.tgt, action: 'Normalised',
+            detail: 'Global bucket label ' + from + ' rewritten to ' + bucket.canonical
+          });
+        }
+      });
+    }
+
+    // ---- fold the pass 2 additions in
+    var out = rebuild(work, queued);
+
+    return { records: out, log: log, before: before, after: runChecks(out, opts), bucket: bucket };
+  }
+
+  /* ============================================================ xlsx write */
+
+  function colName(i) {
+    var n = i + 1, out = '';
+    while (n > 0) {
+      var m = (n - 1) % 26;
+      out = String.fromCharCode(65 + m) + out;
+      n = Math.floor((n - 1) / 26);
+    }
+    return out;
+  }
+
+  function sheetXml(rows) {
+    var out = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'];
+    rows.forEach(function (row, ri) {
+      var r = ri + 1, cells = [], style = ri === 0 ? '1' : '0';
+      (row || []).forEach(function (v, ci) {
+        if (v === null || v === undefined || v === '') return;
+        var ref = colName(ci) + r;
+        if (typeof v === 'number' && isFinite(v)) {
+          cells.push('<c r="' + ref + '" s="' + style + '"><v>' + v + '</v></c>');
+        } else {
+          cells.push('<c r="' + ref + '" s="' + style + '" t="inlineStr"><is><t xml:space="preserve">' +
+            xmlEsc(v) + '</t></is></c>');
+        }
+      });
+      out.push('<row r="' + r + '">' + cells.join('') + '</row>');
+    });
+    out.push('</sheetData></worksheet>');
+    return out.join('');
+  }
+
+  var STYLES_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="10"/><name val="Calibri"/></font>' +
+    '<font><b/><sz val="10"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="3"><fill><patternFill patternType="none"/></fill>' +
+    '<fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF1F3864"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+    '<border><left style="thin"><color rgb="FFD9D9D9"/></left><right style="thin"><color rgb="FFD9D9D9"/></right>' +
+    '<top style="thin"><color rgb="FFD9D9D9"/></top><bottom style="thin"><color rgb="FFD9D9D9"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="2">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
+    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+  function buildXlsx(sheets) {
+    var enc = new TextEncoder();
+    var entries = [];
+    function add(name, text) { entries.push({ name: name, data: enc.encode(text) }); }
+
+    var n = sheets.length;
+    var ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>';
+    sheets.forEach(function (_, i) {
+      ct += '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+    });
+    ct += '</Types>';
+    add('[Content_Types].xml', ct);
+
+    add('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>');
+
+    var wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>';
+    sheets.forEach(function (sh, i) {
+      wb += '<sheet name="' + xmlEsc(sh.name).replace(/"/g, '&quot;') + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+    });
+    wb += '</sheets></workbook>';
+    add('xl/workbook.xml', wb);
+
+    var rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    sheets.forEach(function (_, i) {
+      rels += '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+    });
+    rels += '<Relationship Id="rId' + (n + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>';
+    rels += '</Relationships>';
+    add('xl/_rels/workbook.xml.rels', rels);
+
+    add('xl/styles.xml', STYLES_XML);
+    sheets.forEach(function (sh, i) { add('xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(sh.rows)); });
+
+    return zipStore(entries);
+  }
+
+  /* ================================================================ to grid */
+
+  function toGrid(work, headers, map) {
+    var width = headers.length;
+    work.forEach(function (r) { if (r.cells.length > width) width = r.cells.length; });
+    var grid = [headers.slice()];
+    while (grid[0].length < width) grid[0].push('');
+    work.forEach(function (r) {
+      var row = [];
+      for (var i = 0; i < width; i++) row.push(r.cells[i] === undefined ? '' : r.cells[i]);
+      grid.push(row);
+    });
+    return grid;
+  }
+
+  function buildChangeLog(work, log) {
+    var rows = [['Row (output)', 'Row (input)', 'Transpose before', 'Transpose after', 'Source Table',
+      'Source Column', 'Target Column', 'Action', 'Detail']];
+    var index = new Map();
+    work.forEach(function (r, i) { index.set(r, i + 2); });
+    log.forEach(function (e) {
+      rows.push([
+        index.has(e.ref) ? index.get(e.ref) : '', e.rowIn === null ? 'new' : e.rowIn,
+        e.before, e.after, e.table, e.srcCol, e.tgtCol, e.action, e.detail
+      ]);
+    });
+    return rows;
+  }
+
+  function buildValidationSheet(before, after, rowsIn, rowsOut) {
+    function verdict(c) { return c.fail ? 'FAIL' : 'PASS'; }
+    function beforeText(c, n) {
+      return c.fail ? c.count + ' finding(s) on ' + c.codes.length + ' code(s): ' + c.codes.join(', ')
+        : '0 findings';
+    }
+    var rows = [
+      ['Criterion', 'Before', 'After', 'Status'],
+      ['1. No non-All transpose repeats a Target Column', beforeText(before.c1), beforeText(after.c1), verdict(after.c1)],
+      ['2. No non-All transpose draws on more than one Source Table', beforeText(before.c2), beforeText(after.c2), verdict(after.c2)],
+      ['3. No transpose is entered on a single row', beforeText(before.c3), beforeText(after.c3), verdict(after.c3)],
+      ['Mapping rows', rowsIn, rowsOut, rowsOut - rowsIn >= 0 ? '+' + (rowsOut - rowsIn) : String(rowsOut - rowsIn)],
+      ['Non-All transpose codes', before.codeCount, after.codeCount, ''],
+      ['Global bucket rows', before.allRows, after.allRows, '']
+    ];
+    if (after.advisories.length) {
+      rows.push([]);
+      rows.push(['Outstanding notes (not covered by the three rules)']);
+      rows.push(['Item', '', 'Detail']);
+      after.advisories.forEach(function (a) { rows.push([a.title, '', a.detail]); });
+    }
+    return rows;
+  }
+
+  function toCsv(grid) {
+    return grid.map(function (row) {
+      return row.map(function (v) {
+        var t = v === null || v === undefined ? '' : String(v);
+        return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+      }).join(',');
+    }).join('\r\n');
+  }
+
+  function download(bytes, filename, mime) {
+    var blob = bytes instanceof Blob ? bytes : new Blob([bytes], { type: mime || 'application/octet-stream' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  /* ============================================================== interface */
+
+  var S = {
+    fileName: '', sheets: [], sheetIdx: 0, headers: [], rows: [], map: {},
+    checks: null, fix: null, opts: { ignoreCaseAll: true, pad: true, normaliseAll: false, prefix: 'PR', start: 100 }
+  };
+
+  function $(id) { return document.getElementById(id); }
+
+  function recompute() {
+    if (!S.rows.length) return;
+    S.headers = S.rows[0] || [];
+    if (!Object.keys(S.map).length) S.map = detectMap(S.headers);
+    var recs = toRecords(S.rows, S.map, 1);
+    S.checks = runChecks(recs, { ignoreCaseAll: S.opts.ignoreCaseAll });
+    S.records = recs;
+  }
+
+  function renderMap() {
+    var host = $('mapRow');
+    host.innerHTML = FIELDS.map(function (f) {
+      var opts = ['<option value="">(none)</option>'].concat(S.headers.map(function (h, i) {
+        return '<option value="' + i + '"' + (S.map[f.id] === i ? ' selected' : '') + '>' +
+          esc(s(h) || ('Column ' + (i + 1))) + '</option>';
+      })).join('');
+      return '<label class="field">' + esc(f.label) + (f.required ? ' *' : '') +
+        '<select data-field="' + f.id + '">' + opts + '</select></label>';
+    }).join('');
+    host.querySelectorAll('select').forEach(function (sel) {
+      sel.addEventListener('change', function () {
+        var f = sel.getAttribute('data-field');
+        if (sel.value === '') delete S.map[f];
+        else S.map[f] = parseInt(sel.value, 10);
+        S.fix = null;
+        $('fixOut').innerHTML = '';
+        ['xlsxBtn', 'csvBtn'].forEach(function (id) { $(id).disabled = true; });
+        recompute();
+        renderChecks();
+        renderRepair();
+      });
+    });
+  }
+
+  function card(ruleNum, title, rule, res) {
+    var cls = res.fail ? 'fail' : 'pass';
+    var detail = '';
+    if (res.fail) {
+      if (ruleNum === 1) {
+        detail = '<details><summary>' + res.count + ' finding(s) on ' + res.codes.length + ' code(s)</summary>' +
+          '<div class="tblwrap"><table><thead><tr><th>Transpose</th><th>Target column</th><th>Times</th><th>Source column (row)</th></tr></thead><tbody>' +
+          res.details.map(function (d) {
+            return '<tr><td class="mono">' + esc(d.code) + '</td><td class="mono">' + esc(d.target) + '</td><td>' + d.count +
+              '</td><td>' + d.rows.map(function (r) { return esc(r.srcCol || '(constant)') + ' <span class="mono">(' + r.row + ')</span>'; }).join('<br>') + '</td></tr>';
+          }).join('') + '</tbody></table></div></details>';
+      } else if (ruleNum === 2) {
+        detail = '<details><summary>' + res.count + ' code(s) draw on more than one table</summary>' +
+          '<div class="tblwrap"><table><thead><tr><th>Transpose</th><th>Source tables</th><th>Rows</th></tr></thead><tbody>' +
+          res.details.map(function (d) {
+            return '<tr><td class="mono">' + esc(d.code) + '</td><td>' + d.tables.map(esc).join('<br>') +
+              '</td><td class="mono">' + d.rows.join(', ') + '</td></tr>';
+          }).join('') + '</tbody></table></div></details>';
+      } else {
+        detail = '<details><summary>' + res.count + ' code(s) sit on a single row</summary>' +
+          '<div class="tblwrap"><table><thead><tr><th>Transpose</th><th>Row</th><th>Target column</th></tr></thead><tbody>' +
+          res.details.map(function (d) {
+            return '<tr><td class="mono">' + esc(d.code) + '</td><td class="mono">' + d.rows.join(', ') +
+              '</td><td class="mono">' + d.targets.map(esc).join(', ') + '</td></tr>';
+          }).join('') + '</tbody></table></div></details>';
+      }
+    }
+    return '<article class="card ' + cls + '">' +
+      '<div class="verdict">' + (res.fail ? 'Fail' : 'Pass') + '</div>' +
+      '<h3>' + ruleNum + '. ' + esc(title) + '</h3>' +
+      '<p class="rule">' + esc(rule) + '</p>' +
+      '<p class="meta">' + (res.fail ? res.count + ' finding(s) across ' + res.codes.length + ' transpose(s): ' + esc(res.codes.join(', '))
+        : 'Nothing to fix on this file') + '</p>' + detail + '</article>';
+  }
+
+  function renderChecks() {
+    var c = S.checks;
+    if (!c) return;
+    $('mapPanel').classList.remove('hidden');
+    $('checksPanel').classList.remove('hidden');
+    $('repairPanel').classList.remove('hidden');
+
+    var labels = Object.keys(c.allLabels);
+    $('summary').innerHTML =
+      '<span class="chip"><b>' + c.rows + '</b> mapping rows</span>' +
+      '<span class="chip"><b>' + c.codeCount + '</b> transposes outside the bucket</span>' +
+      '<span class="chip"><b>' + c.allRows + '</b> rows in the global bucket</span>' +
+      (labels.length ? '<span class="chip">bucket label: <b>' + esc(labels.join(' / ')) + '</b></span>' : '');
+
+    $('cards').innerHTML =
+      card(1, 'One target column per transpose',
+        'No transpose outside the global bucket may hold the same Target Column twice', c.c1) +
+      card(2, 'One source table per transpose',
+        'No transpose outside the global bucket may draw on more than one Source Table', c.c2) +
+      card(3, 'No single-row transpose',
+        'Every transpose must be entered on at least two rows', c.c3);
+
+    $('advisories').innerHTML = c.advisories.length
+      ? '<h3 style="font-size:14px;margin:22px 0 8px;color:var(--ink)">' +
+        'Outside the three rules (' + c.advisories.length + ')</h3>' +
+        c.advisories.map(function (a) {
+          return '<div class="adv ' + (a.level === 'info' ? 'info' : '') + '"><h4>' + esc(a.title) +
+            '</h4><p>' + esc(a.detail) + '</p></div>';
+        }).join('')
+      : '';
+
+    var all = c.groups.filter(function (g) { return g.isAll; });
+    $('details').innerHTML = '<details><summary>All ' + c.groups.length + ' transpose labels and their shape</summary>' +
+      '<div class="tblwrap"><table><thead><tr><th>Transpose</th><th>Rows</th><th>Target columns</th><th>Source tables</th><th>Status</th></tr></thead><tbody>' +
+      c.groups.map(function (g) {
+        var bad = [];
+        var dupe = false, seen = {};
+        g.byTarget.forEach(function (rows) {
+          if (rows.length > 1) dupe = true;
+        });
+        if (!g.isAll && dupe) bad.push('rule 1');
+        if (!g.isAll && g.tables.length > 1) bad.push('rule 2');
+        if (!g.isAll && g.rows.length < 2) bad.push('rule 3');
+        return '<tr><td class="mono">' + esc(g.code) + (g.isAll ? ' <span class="chip">bucket</span>' : '') +
+          '</td><td>' + g.rows.length + '</td><td class="mono">' + esc(g.targets.join(', ')) +
+          '</td><td>' + esc(g.tables.join(', ')) + '</td><td>' + (bad.length ? '<span style="color:var(--bad)">' + bad.join(', ') + '</span>' : '<span style="color:var(--ok)">ok</span>') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div></details>';
+  }
+
+  function renderRepair() {
+    var c = S.checks;
+    $('fixBtn').disabled = !c;
+    if (!c) return;
+    if (!c.c1.fail && !c.c3.fail) {
+      $('fixStatus').className = 'status good';
+      $('fixStatus').textContent = 'Nothing to collapse on this file. Running it again will only apply the two ' +
+        'optional rewrites below, if you tick them.';
+    } else {
+      $('fixStatus').className = 'status';
+      $('fixStatus').textContent = '';
+    }
+  }
+
+  function runFix() {
+    var btn = $('fixBtn');
+    btn.disabled = true;
+    try {
+      S.opts.ignoreCaseAll = $('optIgnoreCase').checked;
+      S.opts.pad = $('optPad').checked;
+      S.opts.complete = $('optPad').checked;
+      S.opts.normaliseAll = $('optNormaliseAll').checked;
+      S.opts.prefix = $('optPrefix').value || 'PR';
+      S.opts.start = parseInt($('optStart').value, 10) || 100;
+
+      recompute();
+      var fix = collapse(S.records, S.map, S.opts);
+      S.fix = fix;
+
+      var moved = fix.log.filter(function (e) { return e.action === 'Relocated'; });
+      var added = fix.log.filter(function (e) { return e.action === 'Added'; });
+      var norm = fix.log.filter(function (e) { return e.action === 'Normalised'; });
+      var a = fix.after;
+      var allPass = !a.c1.fail && !a.c2.fail && !a.c3.fail;
+
+      var html = '<div class="adv ' + (allPass ? 'info' : '') + '" style="border-left-color:' + (allPass ? 'var(--ok)' : 'var(--warn)') + '">' +
+        '<h4>' + (allPass ? 'All three rules pass after the repair' : 'Repair applied, but a rule still fails') + '</h4>' +
+        '<p>' + moved.length + ' row(s) reassigned to new codes, ' + added.length + ' row(s) copied in, ' +
+        norm.length + ' global bucket row(s) normalised. ' + a.codeCount + ' transposes now, ' + a.rows + ' rows total.</p></div>';
+
+      if (a.c2.fail) {
+        html += '<div class="adv"><h4>' + a.c2.count + ' transpose(s) still draw on more than one source table</h4>' +
+          '<p>' + esc(a.c2.codes.join(', ')) + '. Rows are never moved between tables, because which table owns ' +
+          'the transpose is a mapping decision. Split or retire those codes by hand.</p></div>';
+      }
+      if (a.c3.fail) {
+        html += '<div class="adv"><h4>' + a.c3.count + ' transpose(s) still sit on a single row</h4>' +
+          '<p>' + esc(a.c3.codes.join(', ')) + '. No other transpose on the same source table maps the columns ' +
+          'they are missing, so there was nothing to copy from. Give each one a second variable, or retire it.</p></div>';
+      }
+
+      if (fix.log.length) {
+        html += '<details open><summary>Planned changes (' + fix.log.length + ')</summary>' +
+          '<div class="tblwrap"><table><thead><tr><th>Action</th><th>Transpose</th><th>Target column</th><th>Source column</th><th>Row in</th><th>Detail</th></tr></thead><tbody>' +
+          fix.log.map(function (e) {
+            return '<tr><td>' + esc(e.action) + '</td><td class="mono">' + esc(e.before || '-') + ' &rarr; ' + esc(e.after) +
+              '</td><td class="mono">' + esc(e.tgtCol) + '</td><td class="mono">' + esc(e.srcCol || '(constant)') +
+              '</td><td class="mono">' + (e.rowIn === null ? 'new' : e.rowIn) + '</td><td>' + esc(e.detail) + '</td></tr>';
+          }).join('') + '</tbody></table></div></details>';
+      } else {
+        html += '<p class="hint">No change was needed.</p>';
+      }
+
+      html += '<details><summary>Before and after, per rule</summary><div class="tblwrap"><table>' +
+        '<thead><tr><th>Criterion</th><th>Before</th><th>After</th></tr></thead><tbody>' +
+        [['1. Duplicate target column per transpose', fix.before.c1, a.c1],
+         ['2. More than one source table per transpose', fix.before.c2, a.c2],
+         ['3. Single-row transpose', fix.before.c3, a.c3]].map(function (row) {
+          function t(x) { return x.fail ? x.count + ' (' + x.codes.join(', ') + ')' : 'none'; }
+          return '<tr><td>' + row[0] + '</td><td>' + t(row[1]) + '</td><td>' + t(row[2]) + '</td></tr>';
+        }).join('') + '</tbody></table></div></details>';
+
+      if (a.advisories.length) {
+        html += '<div style="margin-top:14px">' + a.advisories.map(function (x) {
+          return '<div class="adv ' + (x.level === 'info' ? 'info' : '') + '"><h4>' + esc(x.title) +
+            '</h4><p>' + esc(x.detail) + '</p></div>';
+        }).join('') + '</div>';
+      }
+
+      $('fixOut').innerHTML = html;
+      $('xlsxBtn').disabled = false;
+      $('csvBtn').disabled = false;
+      $('fixStatus').className = 'status ' + (allPass ? 'good' : 'warn');
+      $('fixStatus').textContent = allPass
+        ? 'Ready to download.'
+        : 'Check the notes above before downloading.';
+    } catch (err) {
+      $('fixStatus').className = 'status err';
+      $('fixStatus').textContent = String(err && err.message ? err.message : err);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function baseName() {
+    return (S.fileName || 'transpose-sheet').replace(/\.(xlsx|xlsm|csv|txt)$/i, '');
+  }
+
+  function downloadXlsx() {
+    if (!S.fix) return;
+    var grid = toGrid(S.fix.records, S.headers, S.map);
+    var changes = buildChangeLog(S.fix.records, S.fix.log);
+    var validation = buildValidationSheet(S.fix.before, S.fix.after, S.records.length, S.fix.records.length);
+    var sheetName = (S.sheets[S.sheetIdx] && S.sheets[S.sheetIdx].name) || 'Sheet1';
+    var bytes = buildXlsx([
+      { name: sheetName.slice(0, 31), rows: grid },
+      { name: 'Change Log', rows: changes },
+      { name: 'Validation', rows: validation }
+    ]);
+    download(bytes, baseName() + ' - collapsed.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  }
+
+  function downloadCsv() {
+    if (!S.fix) return;
+    var grid = toGrid(S.fix.records, S.headers, S.map);
+    download(toCsv(grid), baseName() + ' - collapsed.csv', 'text/csv');
+  }
+
+  async function loadFile(file) {
+    var status = $('loadStatus');
+    status.className = 'status';
+    status.textContent = 'Reading ' + file.name + '...';
+    try {
+      var buf = new Uint8Array(await file.arrayBuffer());
+      var sheets;
+      if (/\.csv$|\.txt$/i.test(file.name)) {
+        sheets = [{ name: 'CSV', rows: parseCsv(new TextDecoder('utf-8').decode(buf)) }];
+      } else {
+        sheets = await parseXlsx(buf);
+      }
+      sheets = sheets.filter(function (sh) { return sh.rows && sh.rows.length; });
+      if (!sheets.length) throw new Error('No rows found in this file.');
+
+      S.fileName = file.name;
+      S.sheets = sheets;
+      S.sheetIdx = 0;
+      S.map = {};
+      S.fix = null;
+
+      $('fileLine').classList.remove('hidden');
+      $('fileLine').innerHTML =
+        '<span class="chip"><b>' + esc(file.name) + '</b></span>' +
+        '<span class="chip">' + Math.round(file.size / 1024) + ' KB</span>' +
+        '<span class="chip">' + sheets.length + ' sheet(s)</span>' +
+        '<label class="field" style="margin-left:auto">Sheet' +
+        '<select id="sheetSel">' + sheets.map(function (sh, i) {
+          return '<option value="' + i + '">' + esc(sh.name) + ' (' + Math.max(0, sh.rows.length - 1) + ' rows)</option>';
+        }).join('') + '</select></label>';
+
+      $('sheetSel').addEventListener('change', function (e) {
+        S.sheetIdx = parseInt(e.target.value, 10);
+        S.map = {};
+        S.fix = null;
+        $('fixOut').innerHTML = '';
+        ['xlsxBtn', 'csvBtn'].forEach(function (id) { $(id).disabled = true; });
+        selectSheet();
+      });
+
+      selectSheet();
+      status.className = 'status good';
+      status.textContent = 'Loaded. Checks are below.';
+    } catch (err) {
+      status.className = 'status err';
+      status.textContent = String(err && err.message ? err.message : err);
+    }
+  }
+
+  function selectSheet() {
+    var sh = S.sheets[S.sheetIdx];
+    S.rows = sh.rows;
+    S.headers = S.rows[0] || [];
+    S.map = detectMap(S.headers);
+    S.fix = null;
+    $('xlsxBtn').disabled = true;
+    $('csvBtn').disabled = true;
+    $('fixOut').innerHTML = '';
+    renderMap();
+    recompute();
+    var missing = ['transpose', 'targetCol', 'sourceTable'].filter(function (k) { return S.map[k] === undefined; });
+    if (missing.length) {
+      $('checksPanel').classList.add('hidden');
+      $('repairPanel').classList.add('hidden');
+      $('loadStatus').className = 'status warn';
+      $('loadStatus').textContent = 'Point the required columns at the right headers: ' +
+        missing.map(function (m) { var f = FIELDS.filter(function (x) { return x.id === m; })[0]; return f ? f.label : m; }).join(', ') + '.';
+      renderMap();
+      return;
+    }
+    renderChecks();
+    renderRepair();
+  }
+
+  function init() {
+    var saved = null;
+    try { saved = localStorage.getItem('tcc-theme'); } catch (e) { saved = null; }
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    syncThemeBtn();
+
+    $('themeBtn').addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('tcc-theme', next); } catch (e) {}
+      syncThemeBtn();
+    });
+
+    var drop = $('drop'), input = $('fileInput');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+    });
+    drop.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) loadFile(f);
+    });
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) loadFile(input.files[0]);
+    });
+
+    $('fixBtn').addEventListener('click', runFix);
+    $('xlsxBtn').addEventListener('click', downloadXlsx);
+    $('csvBtn').addEventListener('click', downloadCsv);
+  }
+
+  function syncThemeBtn() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var b = $('themeBtn');
+    b.textContent = dark ? 'Light mode' : 'Dark mode';
+    b.setAttribute('aria-pressed', String(!dark));
+  }
+
+  root.TCC = {
+    parseXlsx: parseXlsx, parseCsv: parseCsv, detectMap: detectMap, toRecords: toRecords,
+    runChecks: runChecks, collapse: collapse, buildXlsx: buildXlsx, toGrid: toGrid,
+    buildChangeLog: buildChangeLog, buildValidationSheet: buildValidationSheet, toCsv: toCsv,
+    unzip: unzip, zipStore: zipStore, crc32: crc32
+  };
+
+  if (typeof document !== 'undefined' && document.getElementById('drop')) {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+</body>
+</html>
